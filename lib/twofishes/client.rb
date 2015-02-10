@@ -44,10 +44,20 @@ module Twofishes
       response = yield
       if response.code == 200
         Result.from_response(response)
+      elsif response.respond_to?(:has_key?) && response.has_key?("exception")
+        exception, message = response["exception"].split(/:\s+/, 2)
+        raise_specific_exception(message, exception, response["stacktrace"])
       else
-        raise Twofishes::InvalidResponseError, response.to_s.lines.first
+        raise InvalidResponseError
       end
     end
 
+    def self.raise_specific_exception(message, exception, backtrace)
+      case message
+      when "don't support url queries" then raise UrlQueryError.new(message, exception, backtrace)
+      when /^(both bounds and ll\+radius, can't pick|no bounds or ll)$/ then raise WrongParamsError.new(message, exception, backtrace)
+      else raise ServerInternalError.new(message, exception, backtrace)
+      end
+    end
   end
 end
